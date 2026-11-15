@@ -1,274 +1,159 @@
-# Build a WhatsApp AI Agent with Twilio, Node.js, and OpenAI
+# Agente IA de WhatsApp para Sociedades de Tasación (SaaS B2B)
 
-A practical example of how to build a WhatsApp AI agent using Twilio’s Messaging API, Node.js, and OpenAI.
+Plataforma inteligente para la **coordinación y seguimiento automático de encargos de tasación inmobiliaria con tasadores a través de WhatsApp**, utilizando Inteligencia Artificial (**Anthropic Claude**) con llamadas a herramientas (*Tool Calling*), **Twilio WhatsApp API** y un **Panel Web de Control en tiempo real**.
 
-This project shows how to:
-
-- Build an AI agent for WhatsApp
-- Handle multi-turn conversations with state
-- Answer FAQs from structured data
-- Create a reservation or booking flow
-- Escalate to a human (stubbed)
-- Test locally using the Twilio WhatsApp Sandbox
-
-If you're searching for **"how to build a WhatsApp AI agent"**, **"Twilio WhatsApp chatbot with OpenAI"**, or **"Node.js AI agent example"**, this repo provides a working implementation you can run and extend.
+El sistema actúa como **Valentina** (coordinadora de operaciones de la sociedad de tasación), eliminando el cuello de botella de tener que perseguir manualmente a cada técnico para conocer el estado de sus expedientes.
 
 ---
 
-## What Is This?
+## 🎯 ¿Qué hace la aplicación actualmente?
 
-This is a developer-focused WhatsApp AI agent built with:
+### 1. Un solo número de WhatsApp para múltiples tasadores (Aislamiento Total)
+- La empresa utiliza **un único número de WhatsApp** (Twilio).
+- El sistema identifica automáticamente a cada tasador por su número de teléfono entrante (`From: whatsapp:+34...`).
+- **Privacidad estricta:** Cada tasador solo ve, consulta y actualiza **sus propios encargos asignados**. Las conversaciones y los contextos de IA están 100% aislados entre sí (por ejemplo, Jose y Beatriz interactúan con sus respectivos lotes de trabajo sin ver los del otro).
 
-- **Twilio WhatsApp API**
-- **Node.js (Express)**
-- **OpenAI (structured extraction + intent classification)**
+### 2. Comprensión de lenguaje natural y acciones automáticas (Tool Calling)
+Los tasadores responden con mensajes rápidos desde el coche o la calle, y Claude interpreta la intención ejecutando cambios directos en la base de datos:
 
-It demonstrates how to design an agent that:
+| Mensaje real del Tasador | Herramienta ejecutada | Acción en el sistema |
+| :--- | :--- | :--- |
+| *"El de Urzaiz lo visito mañana a las 11"* | `agendar_visita` | Asocia el expediente, cambia el estado a `VISITA_CONCERTADA` y guarda fecha/hora y notas. |
+| *"El de Pizarro lo envío hoy"* | `comprometer_entrega` | Registra el compromiso de entrega de informe para *Hoy* y calcula plazos. |
+| *"Si se puede reasignar mejor, hasta el viernes no puedo visitar"* | `solicitar_reasignacion` | Marca el encargo con alerta roja `REASIGNACION_SOLICITADA`, anota el motivo y sugiere al tasador agendar la cita si es urgente. |
+| *"El contacto no contesta al teléfono"* | `reportar_incidencia` | Cambia el estado a `INCIDENCIA` (`CONTACTO_ILOCALIZABLE`) para intervención de la coordinación. |
+| *"¿Qué encargos tengo pendientes?"* | *Consulta de contexto* | Valentina resume los expedientes abiertos del tasador ordenados por urgencia y fecha límite. |
 
-- Understands natural language
-- Extracts structured information (party size, date, time)
-- Maintains conversation context
-- Separates AI interpretation from application logic
-
-The demo uses a restaurant scenario, but the architecture applies to:
-
-- Appointment scheduling
-- Lead intake
-- Customer support automation
-- Service booking systems
-- Internal tools
-
----
-
-## Architecture Overview
-
-High-level request flow:
-
-User (WhatsApp)
-↓
-Twilio Webhook
-↓
-server.js
-↓
-runAgent() (agent.js)
-↓
-tools.js (FAQ / Reservation / Handoff)
-↓
-Twilio REST API → Reply to User
-
-Core files:
-
-- `src/server.js` — Twilio webhook handler
-- `src/agent.js` — AI agent decision logic
-- `src/tools.js` — Integrations + side effects
-- `src/store.js` — Session state
-- `src/bizHours.js` — Business hour checks
-- `data/faq.json` — Editable FAQ knowledge base
+### 3. Panel de Control de Coordinación en Vivo (`/admin`)
+- Accesible en `http://localhost:3000/admin`.
+- **Métricas globales:** Total de encargos, Urgentes, Visitas agendadas, En redacción, Reasignaciones e Informes entregados.
+- **Tabla interactiva:** Muestra el tasador asignado (Jose, Beatriz...), expediente, dirección, municipio, contacto con teléfono, plazos y el último evento detectado por la IA.
+- **Auto-refresco:** Se actualiza automáticamente cada 5 segundos para supervisar en vivo los avances mientras los tasadores chatean por WhatsApp.
 
 ---
 
-## How This WhatsApp AI Agent Works
+## 🏗️ Arquitectura del Sistema
 
-### 1. Message Handling (Twilio → Express)
-
-Incoming WhatsApp messages are delivered via webhook.
-
-```js
-runAgent({ from, userText, session });
+```
+                  ┌──────────────────────────────────────────────┐
+                  │          WhatsApp de la Empresa              │
+                  │             (+1 415 523 8886)                │
+                  └──────────────────────┬───────────────────────┘
+                                         │ Webhook HTTP POST
+                                         ▼
+                                 ┌──────────────┐
+                                 │    ngrok     │
+                                 └───────┬──────┘
+                                         │
+                                         ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Servidor Express (Node.js)                      │
+│                                                                        │
+│  1. Identifica al tasador por su teléfono                              │
+│  2. Carga sus encargos específicos (tasacionesStore.js)                │
+│  3. Invoca a Claude Haiku con Tool Calling                             │
+│  4. Ejecuta transacciones (agendar, comprometer entrega, reasignar)    │
+│  5. Guarda cambios en data/tasaciones.json                             │
+│  6. Responde por WhatsApp vía Twilio REST API                          │
+└──────────────────────────────────┬─────────────────────────────────────┘
+                                   │
+              ┌────────────────────┴────────────────────┐
+              ▼                                         ▼
+   ┌───────────────────────┐                 ┌───────────────────────┐
+   │    WhatsApp Móvil     │                 │   Panel Web Admin     │
+   │  (Jose / Beatriz...)  │                 │ (http://localhost/admin│
+   └───────────────────────┘                 └───────────────────────┘
 ```
 
-Twilio request signatures are validated before processing.
+---
 
-### 2. Conversation Context (Session State)
+## 🚀 Puesta en marcha rápida
 
-Each user gets a lightweight session:
+### 1. Requisitos previos
+- **Node.js** (v18+)
+- Cuenta en **Twilio** (con acceso a WhatsApp Sandbox)
+- Clave de API de **Anthropic** (`sk-ant-...`)
+- **ngrok** instalado
 
-```JSON
-{
-  history: [],
-  flow: null,
-  reservationDraft: {}
-}
-```
-
-This allows:
-
-- Multi-turn reservation flows
-- Context-aware follow-ups
-- Clean state resets
-
-### 3. FAQ System (Deterministic Answers)
-
-Before generating AI responses, the agent checks `faq.json`.
-
-- Regex pattern matching
-- Environment variable templating
-- Consistent, controlled answers
-
-Example:
-
-```JSON
-"Hours:\nMon–Fri: ${BIZ_HOURS_MON_FRI}"
-```
-
-### 4. Reservation Flow (Structured AI Extraction)
-
-When a user says:
-
-> "Can I make a reservation for 2 at 7pm tonight?"
-
-The agent:
-
-1. Extracts party size, date, and time immediately
-2. Stores partial data in reservationDraft
-3. Asks only for missing fields
-4. Confirms the reservation (stubbed)
-
-Phone collection is intentionally stubbed for demo simplicity.
-
-### 5. Human Escalation
-
-If a user asks to speak to a human:
-
-- Business hours are checked
-- Response is adjusted accordingly
-- Escalation is stubbed for extension
-
-**Requirements**
-
-- Node.js 18+
-- npm
-- Twilio Account
-- OpenAI API Key
-- ngrok (or other HTTPS tunnel)
-
-**Quick Start**
-Clone the repository:
-
-```bash
-git clone https://github.com/YOUR_ORG/whatsapp-ai-agent-demo.git
-cd whatsapp-ai-agent-demo
-```
-
-Install dependencies:
-
+### 2. Instalación de dependencias
 ```bash
 npm install
 ```
 
-Create your environment file:
-
-```bash
-cp .env.example .env
-```
-
-Add your credentials:
+### 3. Variables de Entorno (`.env`)
+Configura tu archivo `.env` con los siguientes parámetros:
 
 ```env
-TWILIO_ACCOUNT_SID=ACxxxxxxxx
-TWILIO_AUTH_TOKEN=xxxxxxxx
-TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
-OPENAI_API_KEY=sk-xxxxxxxx
+PORT=3000
 
-PUBLIC_WEBHOOK_URL=https://YOUR_NGROK_URL/twilio/whatsapp
+# URL pública de ngrok (actualizada en cada sesión de túnel)
+PUBLIC_WEBHOOK_URL=https://TU_SUBDOMINIO.ngrok-free.app/twilio/whatsapp
+
+# Credenciales de Twilio
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
+
+# Anthropic Claude
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ANTHROPIC_MODEL=claude-haiku-5-5
 ```
 
-Start the server:
-
+### 4. Iniciar el servidor
 ```bash
 npm run dev
 ```
 
-Expose it:
-
+### 5. Iniciar el túnel de ngrok
+En otra ventana de terminal:
 ```bash
 ngrok http 3000
 ```
+Copia la URL `https://...` generada, actualízala en tu `.env` (`PUBLIC_WEBHOOK_URL`) y pégala en la consola de Twilio (**Messaging > Try it out > Send a WhatsApp message > Sandbox Settings** en *"When a message comes in"*).
 
-## Using the Twilio WhatsApp Sandbox
+---
 
-You do not need a production WhatsApp sender.
+## 👥 Tasadores y Datos de Prueba Iniciales
 
-1. Go to Twilio Console → Messaging → WhatsApp Sandbox
-2. Send the join <code> message from your phone
-3. Configure webhook:
+En `data/tasaciones.json` están precargados los tasadores y encargos de ejemplo:
 
-```nginx
-POST https://YOUR_NGROK_URL/twilio/whatsapp
+### Jose (`whatsapp:+34678885650`)
+- `70380/18` — RÚA DE PIZARRO 16, VIGO (En redacción)
+- `165948/16` — SAMUELLE-TEBRA 00032, TOMIÑO (En redacción)
+- `GH 297191` — IGREXA 11, FORNELOS DE MONTES (Asignado, pendiente de visita)
+- `166074/16` — REVOLTA PARDERRUBIAS 58, SALCEDA (Asignado, **URGENTE**)
+
+### Beatriz (`whatsapp:+34619076032`)
+- `80512/20` — CALLE URZAIZ 45, VIGO (Asignado)
+- `204510/19` — AVDA DE CASTELAO 18, CANGAS (Asignado, **URGENTE**)
+- `GH 310892` — RÚA DO MAR 5, BUEU (Asignado)
+
+---
+
+## 📱 Cómo probar desde WhatsApp
+
+1. Vincula tu número al Sandbox enviando el mensaje `join <código>` al número del Sandbox de Twilio (`+1 415 523 8886`).
+2. Abre en tu navegador el panel de control: **[http://localhost:3000/admin](http://localhost:3000/admin)**.
+3. Envía mensajes reales desde WhatsApp como si fueras el tasador:
+   - *"Hola Valentina, ¿qué encargos tengo pendientes?"*
+   - *"El de Urzaiz lo visito mañana a las 11"*
+   - *"El de Pizarro lo envío hoy"*
+   - *"El de Revolta si se puede reasignar mejor, hasta el viernes no puedo visitar"*
+4. Observa cómo Valentina te responde de forma profesional y cómo los estados, fechas y alertas se actualizan instantáneamente en el panel web.
+
+---
+
+## 📂 Estructura del Proyecto
+
+```text
+├── data/
+│   └── tasaciones.json         # Base de datos JSON de tasadores, encargos y eventos
+├── src/
+│   ├── server.js               # Servidor Express, Webhook de Twilio y Dashboard /admin
+│   ├── agent.js                # Cerebro IA con Claude (Anthropic SDK + Tool Calling)
+│   ├── tasacionesStore.js      # Capa de datos y lógica de negocio de los encargos
+│   └── twilio.js               # Cliente y validador de firmas criptográficas de Twilio
+├── .env                        # Credenciales y configuración local
+├── package.json                # Dependencias y scripts
+└── readme.md                   # Documentación del proyecto
 ```
-
-Now message the sandbox number and test the AI agent.
-
-## Customization Guide
-
-### Change Business Details
-
-Edit `.env`:
-
-```env
-RESTAURANT_NAME=Your Business
-RESTAURANT_ADDRESS=Your Address
-BIZ_HOURS_MON_FRI=09:00-17:00
-```
-
-### Update FAQ Answers
-
-Modify:
-
-```bash
-data/faq.json
-```
-
-Add patterns and responses.
-
-### Replace Reservation Stub
-
-Replace `createReservationStub()` in:
-
-```bash
-src/tools.js
-```
-
-Integrate:
-
-- OpenTable
-- Calendly
-- Custom booking APIs
-- Database storage
-
-### Persist Sessions
-
-Swap in-memory session storage for:
-
-- Redis
-- PostgreSQL
-- MongoDB
-
-### Security Notes
-
-- `.env` is excluded from Git
-- OpenAI keys remain server-side
-- Twilio signatures are validated
-- AI output is constrained to structured JSON
-- Code retains execution control
-
-### Common Questions
-
-**Why use Twilio for WhatsApp AI agents?**
-Twilio handles WhatsApp infrastructure, compliance, and delivery while your code focuses on conversation logic.
-
-**Can this be adapted for SMS?**
-Yes. Replace the WhatsApp sender with SMS in Twilio and reuse the same agent architecture.
-
-**Is this production-ready?**
-It’s production-patterned. This is a demo repo and should not be considered production ready.
-
-**Extend This Project**
-
-- Add vector search for smarter FAQs
-- Add Twilio Conversations for live agent handoff
-- Add analytics for intent tracking
-- Add authentication for user-specific workflows
-
-**License**
-MIT License

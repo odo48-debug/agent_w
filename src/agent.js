@@ -1,276 +1,285 @@
-import OpenAI from "openai";
-import { lookupRestaurantFaq, createReservationStub, handoffToHumanStub } from "./tools.js";
-import { isWithinBusinessHours } from "./bizHours.js";
+import Anthropic from "@anthropic-ai/sdk";
+import {
+	getOrCreateTasador,
+	getEncargosActivos,
+	agendarVisita,
+	comprometerEntrega,
+	solicitarReasignacion,
+	reportarIncidencia,
+	marcarInformeEntregado
+} from "./tasacionesStore.js";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 function mustHaveEnv(name) {
 	if (!process.env[name]) throw new Error(`Missing ${name}`);
 }
 
-function restaurantContext() {
-	return {
-		name: process.env.RESTAURANT_NAME || "Our Business",
-		phone: process.env.RESTAURANT_PHONE || "N/A",
-		address: process.env.RESTAURANT_ADDRESS || "N/A",
-		tz: process.env.RESTAURANT_TIMEZONE || "America/Chicago"
-	};
-}
+const TOOLS_CONFIG = [
+	{
+		name: "agendar_visita",
+		description: "Registra la fecha y hora concertada para la visita del inmueble de un encargo.",
+		input_schema: {
+			type: "object",
+			properties: {
+				num_expediente: {
+					type: "string",
+					description: "Número de expediente o palabra clave de la dirección (ej: 'GH 297191', 'Igrexa', 'Pizarro', '70380/18')"
+				},
+				fecha_hora_visita: {
+					type: "string",
+					description: "Día y hora de la visita concertada (ej: 'Jueves a las 16:30', 'Mañana a las 10:00')"
+				},
+				notas: {
+					type: "string",
+					description: "Observaciones relevantes (ej: 'A petición del contacto', 'Llaves en portería')"
+				}
+			},
+			required: ["num_expediente", "fecha_hora_visita"]
+		}
+	},
+	{
+		name: "comprometer_entrega",
+		description: "Registra el compromiso o estimación de entrega del informe de tasación por parte del tasador.",
+		input_schema: {
+			type: "object",
+			properties: {
+				num_expediente: {
+					type: "string",
+					description: "Número de expediente o dirección (ej: '70380/18', 'Pizarro')"
+				},
+				fecha_entrega: {
+					type: "string",
+					description: "Cuándo se entregará el informe (ej: 'Hoy', 'Mañana por la mañana', 'El viernes antes de las 14h')"
+				},
+				notas: {
+					type: "string",
+					description: "Notas o comentarios adicionales"
+				}
+			},
+			required: ["num_expediente", "fecha_entrega"]
+		}
+	},
+	{
+		name: "solicitar_reasignacion",
+		description: "Registra la solicitud del tasador para que el encargo sea reasignado a otro técnico por falta de disponibilidad o imposibilidad de cumplir plazos.",
+		input_schema: {
+			type: "object",
+			properties: {
+				num_expediente: {
+					type: "string",
+					description: "Número de expediente o dirección (ej: '166074/16', 'Revolta')"
+				},
+				motivo: {
+					type: "string",
+					description: "Motivo por el que no puede realizarlo a tiempo"
+				},
+				disponibilidad: {
+					type: "string",
+					description: "Cuándo podría en caso de no reasignarse (ej: 'Hasta el viernes no puedo visitar')"
+				}
+			},
+			required: ["num_expediente", "motivo"]
+		}
+	},
+	{
+		name: "reportar_incidencia",
+		description: "Registra un problema o incidencia con el encargo (ej. contacto no responde al teléfono, error en catastro, acceso denegado).",
+		input_schema: {
+			type: "object",
+			properties: {
+				num_expediente: {
+					type: "string",
+					description: "Número de expediente o dirección"
+				},
+				tipo: {
+					type: "string",
+					enum: ["CONTACTO_ILOCALIZABLE", "ACCESO_DENEGADO", "FALTA_DOCUMENTACION", "OTRO"],
+					description: "Tipo de incidencia"
+				},
+				descripcion: {
+					type: "string",
+					description: "Detalle de lo ocurrido"
+				}
+			},
+			required: ["num_expediente", "tipo", "descripcion"]
+		}
+	},
+	{
+		name: "marcar_informe_entregado",
+		description: "Registra que el tasador ha finalizado y enviado el informe de valoración.",
+		input_schema: {
+			type: "object",
+			properties: {
+				num_expediente: {
+					type: "string",
+					description: "Número de expediente o dirección"
+				},
+				notas: {
+					type: "string",
+					description: "Detalles del envío"
+				}
+			},
+			required: ["num_expediente"]
+		}
+	}
+];
 
-function missingReservationFields(draft) {
-	// Phone intentionally NOT required for the demo.
-	const missing = [];
-	if (!draft.partySize) missing.push("partySize");
-	if (!draft.date) missing.push("date");
-	if (!draft.time) missing.push("time");
-	if (!draft.name) missing.push("name");
-	return missing;
-}
-
-function nextReservationQuestion(missing) {
-	const field = missing[0];
-
-	switch (field) {
-		case "partySize":
-			return "Absolutely — how many people should I plan for?";
-		case "date":
-			return "Nice. What day were you thinking — today, tomorrow, or another date?";
-		case "time":
-			return "And what time works best?";
-		case "name":
-			return "Perfect. What name should I put it under?";
+function executeTool(name, input, phone) {
+	console.log(`[Tool Call] Executing ${name}:`, input);
+	switch (name) {
+		case "agendar_visita":
+			return agendarVisita({
+				numExpediente: input.num_expediente,
+				fechaHora: input.fecha_hora_visita,
+				notas: input.notas,
+				phone
+			});
+		case "comprometer_entrega":
+			return comprometerEntrega({
+				numExpediente: input.num_expediente,
+				fechaCompromiso: input.fecha_entrega,
+				notas: input.notas,
+				phone
+			});
+		case "solicitar_reasignacion":
+			return solicitarReasignacion({
+				numExpediente: input.num_expediente,
+				motivo: input.motivo,
+				disponibilidad: input.disponibilidad,
+				phone
+			});
+		case "reportar_incidencia":
+			return reportarIncidencia({
+				numExpediente: input.num_expediente,
+				tipo: input.tipo,
+				descripcion: input.descripcion,
+				phone
+			});
+		case "marcar_informe_entregado":
+			return marcarInformeEntregado({
+				numExpediente: input.num_expediente,
+				notas: input.notas,
+				phone
+			});
 		default:
-			return "Got it — what details should I add?";
+			return { success: false, message: `Herramienta desconocida ${name}` };
 	}
-}
-
-async function extractReservationFields({ model, userText }) {
-	const tz = process.env.RESTAURANT_TIMEZONE || "America/Chicago";
-
-	const extractorSystem = `
-Extract reservation details from the user's message.
-Return JSON only:
-{
-  "partySize": number|null,
-  "date": "YYYY-MM-DD"|null,
-  "time": "HH:mm"|null,
-  "name": string|null,
-  "phone": string|null,
-  "notes": string|null,
-  "cancel": boolean
-}
-Rules:
-- If user wants to cancel/stop, set cancel=true.
-- If no value present, use null.
-- Interpret relative dates like "today", "tonight", "this evening", "tomorrow" using timezone: ${tz}.
-- Convert times like "7pm" to 24-hour "19:00".
-- If the user says "this evening" and provides a time, treat date as today.
-`;
-
-	const extraction = await openai.chat.completions.create({
-		model,
-		messages: [
-			{ role: "system", content: extractorSystem.trim() },
-			{ role: "user", content: userText }
-		],
-		response_format: { type: "json_object" }
-	});
-
-	try {
-		return JSON.parse(extraction.choices[0].message.content);
-	} catch {
-		return {};
-	}
-}
-
-function mergeDraft(draft, parsed) {
-	const next = { ...draft };
-	for (const key of ["partySize", "date", "time", "name", "phone", "notes"]) {
-		const v = parsed?.[key];
-		if (v !== null && v !== undefined && v !== "") next[key] = v;
-	}
-	return next;
 }
 
 export async function runAgent({ from, userText, session }) {
-	mustHaveEnv("OPENAI_API_KEY");
-	const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
-	const info = restaurantContext();
+	mustHaveEnv("ANTHROPIC_API_KEY");
+	const model = process.env.ANTHROPIC_MODEL || "claude-haiku-5-5";
 
-	// --- Reservation flow mode ---
-	if (session.flow === "RESERVATION") {
-		const parsed = await extractReservationFields({ model, userText });
+	// 1. Identificar al tasador y cargar sus encargos específicos
+	const tasador = getOrCreateTasador(from);
+	const encargos = getEncargosActivos(from);
 
-		if (parsed.cancel) {
-			session.flow = null;
-			session.reservationDraft = {};
-			return {
-				reply: "No problem — I’ve cancelled the reservation request. Anything else I can help with?",
-				newSession: session
-			};
-		}
+	const encargosContext = encargos.length > 0
+		? encargos.map(e => (
+			`• Expediente: ${e.num_expediente} | Dirección: ${e.direccion}, ${e.municipio} | Estado: ${e.estado} | Urgente: ${e.es_urgente ? "SÍ" : "NO"} | Contacto: ${e.contacto_nombre} (${e.contacto_telefono}) | Límite: ${e.fecha_limite_entrega} | Visita pactada: ${e.fecha_visita_concertada || "Pendiente"} | Entrega estimada: ${e.fecha_estimada_entrega || "Pendiente"}`
+		)).join("\n")
+		: "No hay encargos asignados actualmente a este tasador.";
 
-		session.reservationDraft = mergeDraft(session.reservationDraft, parsed);
+	const systemPrompt = `
+Eres Valentina, coordinadora de operaciones en la sociedad de tasación (Krata / Tinsa).
+Tu labor es coordinar a los tasadores vía WhatsApp para asegurar que las visitas se conciertan con rapidez y los informes se entregan en plazo.
+Te comunicas de manera profesional, cercana, concisa y directa, como en el día a día real de un gabinete de tasación.
 
-		const missing = missingReservationFields(session.reservationDraft);
-		if (missing.length > 0) {
-			return { reply: nextReservationQuestion(missing), newSession: session };
-		}
+ESTÁS HABLANDO CON EL/LA TASADOR/A: ${tasador.nombre}. Trátale por su nombre de forma natural.
 
-		const result = await createReservationStub({ from, draft: session.reservationDraft });
+INSTRUCCIONES CLAVE:
+1. Cuando el tasador te indique una fecha u hora de visita, usa la herramienta "agendar_visita".
+2. Cuando el tasador indique cuándo entregará el informe (ej. "el de Pizarro lo envío hoy", "mañana por la mañana"), usa la herramienta "comprometer_entrega".
+3. Cuando el tasador no pueda cumplir y pida reasignar o no tenga disponibilidad, usa "solicitar_reasignacion". En esos casos, si es muy urgente, pídele amablemente si al menos puede dejar la visita agendada con el contacto.
+4. Cuando el tasador reporte un problema (contacto no atiende el teléfono, llaves no disponibles), usa "reportar_incidencia".
+5. Si el tasador pregunta por sus encargos, respóndele de forma sintética indicando los expedientes pendientes o las prioridades.
+6. Mantén tus mensajes breves y naturales (adecuados para WhatsApp). No uses saludos formales excesivos si ya estás en una conversación en curso.
 
-		session.flow = null;
-		session.reservationDraft = {};
+ENCARGOS ASIGNADOS A ESTE TASADOR:
+${encargosContext}
+`.trim();
 
-		const msg =
-			`✅ You’re all set (demo)\n` +
-			`Name: ${result.name}\n` +
-			`Party: ${result.partySize}\n` +
-			`When: ${result.date} at ${result.time}\n` +
-			`Confirmation: ${result.reservationId}\n\n` +
-			`Anything else I can help with?`;
+	const history = (session.history || []).map(m => ({
+		role: m.role,
+		content: m.content
+	}));
 
-		return { reply: msg, newSession: session };
-	}
-
-	// --- Normal mode: plan what to do ---
-	const withinHours = isWithinBusinessHours();
-	const history = session.history.slice(-10);
-
-	const system = `
-You are the WhatsApp assistant for "${info.name}".
-You can:
-1) Answer FAQs (hours, location, menu/dietary, parking, specials, takeout).
-2) Start a reservation/appointment flow.
-3) Start a human handoff.
-Keep messages short and friendly. Ask one question at a time.
-Return JSON only:
-{
-  "intent": "FAQ"|"RESERVATION"|"HANDOFF"|"GENERAL",
-  "startReservation": boolean,
-  "startHandoff": boolean,
-  "faqQuery": string|null,
-  "handoffSummary": string|null,
-  "reply": string
-}
-Business hours availability right now: ${withinHours ? "AVAILABLE" : "NOT_AVAILABLE"}.
-`;
-
-	const decision = await openai.chat.completions.create({
-		model,
-		messages: [
-			{ role: "system", content: system.trim() },
-			...history,
-			{ role: "user", content: userText }
-		],
-		response_format: { type: "json_object" }
-	});
-
-	let plan;
-	try {
-		plan = JSON.parse(decision.choices[0].message.content);
-	} catch {
-		plan = {
-			intent: "GENERAL",
-			startReservation: false,
-			startHandoff: false,
-			faqQuery: null,
-			handoffSummary: null,
-			reply: "Could you rephrase that?"
-		};
-	}
-
-	// Try FAQ tool first when appropriate
-	if (plan.intent === "FAQ" || plan.faqQuery) {
-		const answer = await lookupRestaurantFaq({ question: plan.faqQuery || userText });
-		if (answer) {
-			session.history = [
-				...history,
-				{ role: "user", content: userText },
-				{ role: "assistant", content: answer }
-			];
-			return { reply: answer, newSession: session };
-		}
-	}
-
-	// Start reservation flow — IMPORTANT: extract immediately from the original user message
-	if (plan.startReservation || plan.intent === "RESERVATION") {
-		session.flow = "RESERVATION";
-
-		const initialParsed = await extractReservationFields({ model, userText });
-		if (initialParsed.cancel) {
-			session.flow = null;
-			session.reservationDraft = {};
-			const msg = "All good — I won’t make a reservation. Anything else?";
-			session.history = [...history, { role: "user", content: userText }, { role: "assistant", content: msg }];
-			return { reply: msg, newSession: session };
-		}
-
-		session.reservationDraft = mergeDraft({}, initialParsed);
-
-		const missing = missingReservationFields(session.reservationDraft);
-		const reply = missing.length > 0
-			? nextReservationQuestion(missing)
-			: "Got it. What name should I put it under?";
-
-		session.history = [
-			...history,
-			{ role: "user", content: userText },
-			{ role: "assistant", content: reply }
-		];
-
-		// If we somehow already have everything including name, we can auto-confirm.
-		// (We keep it simple and ask for name if missingReservationFields returned empty unexpectedly.)
-		if (missing.length === 0 && session.reservationDraft.name) {
-			const result = await createReservationStub({ from, draft: session.reservationDraft });
-
-			session.flow = null;
-			session.reservationDraft = {};
-
-			const msg =
-				`✅ Reservation confirmed (demo)\n` +
-				`• Name: ${result.name}\n` +
-				`• Party: ${result.partySize}\n` +
-				`• When: ${result.date} at ${result.time}\n` +
-				`Confirmation: ${result.reservationId}\n\n` +
-				`Anything else you’d like to know about ${info.name}?`;
-
-			session.history = [...history, { role: "user", content: userText }, { role: "assistant", content: msg }];
-			return { reply: msg, newSession: session };
-		}
-
-		return { reply, newSession: session };
-	}
-
-	// Start human handoff (stub)
-	if (plan.startHandoff || plan.intent === "HANDOFF") {
-		const summary = plan.handoffSummary || userText;
-		const result = await handoffToHumanStub({ from, summary });
-
-		const reply = result.available
-			? `Got it — I’m looping in a human now (demo). Please share any extra details here and they’ll reply shortly.\nRef: ${result.handoffId}`
-			: `We’re currently outside business hours. I can take a message and a human will follow up when we’re open.\nRef: ${result.handoffId}\nWhat should I pass along?`;
-
-		session.history = [
-			...history,
-			{ role: "user", content: userText },
-			{ role: "assistant", content: reply }
-		];
-
-		return { reply, newSession: session };
-	}
-
-	// Default reply
-	const reply =
-		typeof plan.reply === "string" && plan.reply.trim()
-			? plan.reply.trim()
-			: `How can I help? (hours, reservations, or a human)`;
-
-	session.history = [
+	// Primera llamada a Claude con herramientas
+	const currentMessages = [
 		...history,
-		{ role: "user", content: userText },
-		{ role: "assistant", content: reply }
+		{ role: "user", content: userText }
 	];
 
-	return { reply, newSession: session };
+	let response = await anthropic.messages.create({
+		model,
+		max_tokens: 1024,
+		system: systemPrompt,
+		messages: currentMessages,
+		tools: TOOLS_CONFIG
+	});
+
+	let toolResults = [];
+
+	// Si Claude decide ejecutar herramientas
+	if (response.stop_reason === "tool_use") {
+		const assistantContent = response.content;
+		const toolCalls = assistantContent.filter(c => c.type === "tool_use");
+
+		for (const call of toolCalls) {
+			const res = executeTool(call.name, call.input, from);
+			toolResults.push({
+				type: "tool_result",
+				tool_use_id: call.id,
+				content: JSON.stringify(res)
+			});
+		}
+
+		// Segunda llamada a Claude para que genere la respuesta natural tras ejecutar las herramientas
+		const followUpMessages = [
+			...currentMessages,
+			{ role: "assistant", content: assistantContent },
+			{ role: "user", content: toolResults }
+		];
+
+		const followUpResponse = await anthropic.messages.create({
+			model,
+			max_tokens: 1024,
+			system: systemPrompt,
+			messages: followUpMessages
+		});
+
+		const replyText = followUpResponse.content
+			.filter(c => c.type === "text")
+			.map(c => c.text)
+			.join("\n");
+
+		const newSession = {
+			...session,
+			history: [
+				...history,
+				{ role: "user", content: userText },
+				{ role: "assistant", content: replyText }
+			].slice(-20)
+		};
+
+		return { reply: replyText, newSession };
+	}
+
+	// Si no hubo tool calls, extraer la respuesta de texto directa
+	const replyText = response.content
+		.filter(c => c.type === "text")
+		.map(c => c.text)
+		.join("\n") || "Entendido.";
+
+	const newSession = {
+		...session,
+		history: [
+			...history,
+			{ role: "user", content: userText },
+			{ role: "assistant", content: replyText }
+		].slice(-20)
+	};
+
+	return { reply: replyText, newSession };
 }

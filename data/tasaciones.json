@@ -1,0 +1,270 @@
+{
+  "tasadores": [
+    {
+      "id": "tas-1",
+      "nombre": "Jose",
+      "telefono": "whatsapp:+34678885650"
+    },
+    {
+      "id": "tas-2",
+      "nombre": "Beatriz",
+      "telefono": "whatsapp:+34619076032"
+    }
+  ],
+  "encargos": [
+    {
+      "id": "enc-1",
+      "num_expediente": "70380/18",
+      "direccion": "RUA DE PIZARRO 16",
+      "municipio": "VIGO",
+      "provincia": "Pontevedra",
+      "tipo_inmueble": "Vivienda en bloque",
+      "es_urgente": false,
+      "contacto_nombre": "Carlos Mendez",
+      "contacto_telefono": "+34 611 22 33 44",
+      "fecha_limite_entrega": "2026-10-23",
+      "fecha_visita_concertada": "Martes que viene a las 12:00",
+      "fecha_estimada_entrega": null,
+      "estado": "VISITA_CONCERTADA",
+      "tasador_id": "tas-1",
+      "tasador_nombre": "Jose",
+      "historial_eventos": [
+        {
+          "fecha": "2026-10-21T12:00:00.000Z",
+          "tipo": "VISITA_REALIZADA",
+          "detalle": "Visita completada. Pendiente redacción del informe."
+        },
+        {
+          "fecha": "2026-11-13T18:13:37.439Z",
+          "tipo": "VISITA_CONCERTADA",
+          "detalle": "Visita agendada para: Martes que viene a las 12:00. Notas: Cambio de visita comunicado por el tasador (antes pactada 2026-10-21 11:00)"
+        }
+      ]
+    },
+    {
+      "id": "enc-2",
+      "num_expediente": "165948/16",
+      "direccion": "SAMUELLE-TEBRA 00032",
+      "municipio": "TOMIÑO",
+      "provincia": "Pontevedra",
+      "tipo_inmueble": "Vivienda unifamiliar",
+      "es_urgente": false,
+      "contacto_nombre": "Ana Belén Prado",
+      "contacto_telefono": "+34 622 33 44 55",
+      "fecha_limite_entrega": "2026-10-24",
+      "fecha_visita_concertada": "2026-10-22 17:00",
+      "fecha_estimada_entrega": null,
+      "estado": "VISITADO_EN_REDACCION",
+      "tasador_id": "tas-1",
+      "tasador_nombre": "Jose",
+      "historial_eventos": []
+    },
+    {
+      "id": "enc-3",
+      "num_expediente": "GH 297191",
+      "direccion": "IGREXA 11",
+      "municipio": "FORNELOS DE MONTES",
+      "provincia": "Pontevedra",
+      "tipo_inmueble": "Casa rústica",
+      "es_urgente": false,
+      "contacto_nombre": "Ramón Iglesias",
+      "contacto_telefono": "+34 633 44 55 66",
+      "fecha_limite_entrega": "2026-10-30",
+      "fecha_visita_concertada": null,
+      "fecha_estimada_entrega": null,
+      "estado": "ASIGNADO",
+      "tasador_id": "tas-1",
+      "tasador_nombre": "Jose",
+      "historial_eventos": [
+        {
+          "fecha": "2026-10-27T08:40:00.000Z",
+          "tipo": "ASIGNADO",
+          "detalle": "Encargo asignado por Valentina. Pendiente agendar visita."
+        }
+      ]
+    },
+    {
+      "id": "enc-4",
+      "num_expediente": "166074/16",
+      "direccion": "REVOLTA PARDERRUBIAS 58",
+      "municipio": "SALCEDA DE CASELAS",
+      "provincia": "Pontevedra",
+      "tipo_inmueble": "Nave industrial",
+      "es_urgente": true,
+      "contacto_nombre": "Marcos Souto",
+      "contacto_telefono": "+34 644 55 66 77",
+      "fecha_limite_entrega": "2026-10-31",
+      "fecha_visita_concertada": null,
+      "fecha_estimada_entrega": null,
+      "estado": "ASIGNADO",
+      "tasador_id": "tas-1",
+      "tasador_nombre": "Jose",
+      "historial_eventos": [
+        {
+          "fecha": "2026-10-28T11:35:00.000Z",
+          "tipo": "ASIGNADO_URGENTE",
+          "detalle": "Encargo urgente asignado. Requiere agilizar visita y entrega."
+        }
+      ]
+    },
+    {
+      "id": "enc-5",
+      "num_expediente": "80512/20",
+      "direccion": "CALLE URZAIZ 45",
+      "municipio": "VIGO",
+      "provincia": "Pontevedra",
+      "tipo_inmueble": "Vivienda en planta 3",
+      "es_urgente": false,
+      "contacto_nombre": "Pedro Alvite",
+      "contacto_telefono": "+34 655 11 22 33",
+      "fecha_limite_entrega": "2026-11-18",
+      "fecha_visita_concertada": null,
+      "fecha_estimada_entrega": null,
+      "estado": "ASIGNADO",
+      "tasador_id": "tas-2",
+      "tasador_nombre": "Beatriz",
+      "historial_eventos": [
+        {
+          "fecha": "2026-11-13T09:00:00.000Z",
+          "tipo": "ASIGNADO",
+          "detalle": "Encargo asignado a Beatriz. Pendiente concertar visita."
+        },
+        {
+          "fecha": "2026-11-13T15:24:12.133Z",
+          "tipo": "VISITA_CONCERTADA",
+          "detalle": "Visita agendada para: Mañana a las 11:00. Notas: Calle Urzaiz 45, Vigo. Contacto: Pedro Alvite (+34 655 11 22 33)"
+        }
+      ]
+    },
+    {
+      "id": "enc-6",
+      "num_expediente": "204510/19",
+      "direccion": "AVDA DE CASTELAO 18",
+      "municipio": "CANGAS",
+      "provincia": "Pontevedra",
+      "tipo_inmueble": "Local comercial",
+      "es_urgente": true,
+      "contacto_nombre": "Marta Rivas",
+      "contacto_telefono": "+34 666 22 33 44",
+      "fecha_limite_entrega": "2026-11-16",
+      "fecha_visita_concertada": null,
+      "fecha_estimada_entrega": null,
+      "estado": "ASIGNADO",
+      "tasador_id": "tas-2",
+      "tasador_nombre": "Beatriz",
+      "historial_eventos": [
+        {
+          "fecha": "2026-11-13T09:15:00.000Z",
+          "tipo": "ASIGNADO_URGENTE",
+          "detalle": "Encargo urgente en Cangas. Prioridad alta de visita."
+        }
+      ]
+    },
+    {
+      "id": "enc-7",
+      "num_expediente": "GH 310892",
+      "direccion": "RUA DO MAR 5",
+      "municipio": "BUEU",
+      "provincia": "Pontevedra",
+      "tipo_inmueble": "Chalet unifamiliar",
+      "es_urgente": false,
+      "contacto_nombre": "Daniel Seoane",
+      "contacto_telefono": "+34 677 33 44 55",
+      "fecha_limite_entrega": "2026-11-20",
+      "fecha_visita_concertada": "18/11/2026 a las 11:00",
+      "fecha_estimada_entrega": null,
+      "estado": "VISITA_CONCERTADA",
+      "tasador_id": "tas-2",
+      "tasador_nombre": "Beatriz",
+      "historial_eventos": [
+        {
+          "fecha": "2026-11-13T09:30:00.000Z",
+          "tipo": "ASIGNADO",
+          "detalle": "Encargo asignado a Beatriz. Vivienda unifamiliar en Bueu."
+        },
+        {
+          "fecha": "2026-11-13T19:39:39.496Z",
+          "tipo": "VISITA_CONCERTADA",
+          "detalle": "Visita agendada para: 18/11/2026 a las 11:00. Notas: Propuesta enviada a Daniel Seoane (+34 677 33 44 55), pendiente de su confirmación."
+        },
+        {
+          "fecha": "2026-11-13T19:39:58.677Z",
+          "tipo": "VISITA_CONCERTADA",
+          "detalle": "Visita agendada para: 18/11/2026 a las 11:00. Notas: Visita confirmada por el contacto Daniel Seoane (+34 677 33 44 55)"
+        }
+      ]
+    },
+    {
+      "id": "enc-5",
+      "num_expediente": "80512/20",
+      "direccion": "CALLE URZAIZ 45",
+      "municipio": "VIGO",
+      "provincia": "Pontevedra",
+      "tipo_inmueble": "Vivienda en planta 3",
+      "es_urgente": false,
+      "contacto_nombre": "Pedro Alvite",
+      "contacto_telefono": "+34 655 11 22 33",
+      "fecha_limite_entrega": "2026-11-18",
+      "fecha_visita_concertada": null,
+      "fecha_estimada_entrega": null,
+      "estado": "ASIGNADO",
+      "tasador_id": "tas-2",
+      "tasador_nombre": "Beatriz",
+      "historial_eventos": [
+        {
+          "fecha": "2026-11-13T09:00:00.000Z",
+          "tipo": "ASIGNADO",
+          "detalle": "Encargo asignado a Beatriz. Pendiente concertar visita."
+        }
+      ]
+    },
+    {
+      "id": "enc-6",
+      "num_expediente": "204510/19",
+      "direccion": "AVDA DE CASTELAO 18",
+      "municipio": "CANGAS",
+      "provincia": "Pontevedra",
+      "tipo_inmueble": "Local comercial",
+      "es_urgente": true,
+      "contacto_nombre": "Marta Rivas",
+      "contacto_telefono": "+34 666 22 33 44",
+      "fecha_limite_entrega": "2026-11-16",
+      "fecha_visita_concertada": null,
+      "fecha_estimada_entrega": null,
+      "estado": "ASIGNADO",
+      "tasador_id": "tas-2",
+      "tasador_nombre": "Beatriz",
+      "historial_eventos": [
+        {
+          "fecha": "2026-11-13T09:15:00.000Z",
+          "tipo": "ASIGNADO_URGENTE",
+          "detalle": "Encargo urgente en Cangas. Prioridad alta de visita."
+        }
+      ]
+    },
+    {
+      "id": "enc-7",
+      "num_expediente": "GH 310892",
+      "direccion": "RUA DO MAR 5",
+      "municipio": "BUEU",
+      "provincia": "Pontevedra",
+      "tipo_inmueble": "Chalet unifamiliar",
+      "es_urgente": false,
+      "contacto_nombre": "Daniel Seoane",
+      "contacto_telefono": "+34 677 33 44 55",
+      "fecha_limite_entrega": "2026-11-20",
+      "fecha_visita_concertada": null,
+      "fecha_estimada_entrega": null,
+      "estado": "ASIGNADO",
+      "tasador_id": "tas-2",
+      "tasador_nombre": "Beatriz",
+      "historial_eventos": [
+        {
+          "fecha": "2026-11-13T09:30:00.000Z",
+          "tipo": "ASIGNADO",
+          "detalle": "Encargo asignado a Beatriz. Vivienda unifamiliar en Bueu."
+        }
+      ]
+    }
+  ]
+}
